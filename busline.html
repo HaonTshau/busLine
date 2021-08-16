@@ -1,0 +1,576 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <title>查询</title>
+    <script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=xVGPXcfWdakjd64krbfPfUIyxahZeWXZ"></script>
+    <script type="text/javascript" src="http://api.map.baidu.com/library/DistanceTool/1.2/src/DistanceTool_min.js"></script>
+
+    <script charset="utf-8" src="https://map.qq.com/api/js?v=2.exp&key=OB4BZ-D4W3U-B7VVO-4PJWW-6TKDJ-WPB77"></script>
+
+    <link rel="stylesheet" type="text/css" href="http://api.map.baidu.com/res/12/bmap.css">
+    <style type="text/css">
+    html {
+        height: 100%
+    }
+    
+    body {
+        height: 100%;
+        margin: 0px;
+        padding: 0px;
+        font-size: 16px;
+    }
+    
+    #container {
+        height: 100%;
+        width: 100%;
+        position: relative;
+        z-index: 1;
+    }
+    
+    #input-panel {
+        position: absolute;
+        top: 15px;
+        left: 15px;
+        z-index: 2;
+    }
+    
+    #line-panel {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: white;
+        box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2);
+        padding: 0 1rem;
+    }
+    
+    #line-panel p {
+        margin: 0;
+        line-height: 3rem;
+        display: inline-block;
+        padding: 0 1rem;
+        cursor: pointer;
+        font-size: 12px;
+    }
+    
+    #line-panel p:hover {
+        background: #eee;
+    }
+    
+    #line-panel .highlight {
+        background: #eee;
+        background: #00C87B
+    }
+    
+    #line-panel p span {
+        width: 2rem;
+        height: 8px;
+        display: inline-block;
+        background: red;
+        margin-right: .5rem;
+    }
+    
+    input {
+        font-size: 1rem;
+        padding: 0.5rem 1rem;
+    }
+    </style>
+</head>
+
+<body>
+    <div id="container"></div>
+    <div id="input-panel">
+        <input type="text" name="" placeholder="搜索" id="suggestId">
+        <button onclick="toDistenceTool()">鼠标测距</button>
+        <button onclick="changeMouseEvent('mousePointBtn',event);" id="mousePointBtn">鼠标选点：关</button>
+        <div id="searchResultPanel" style="border:1px solid #C0C0C0;width:150px;height:auto; display:none;"></div>
+    </div>
+    <div id="line-panel">
+    </div>
+    <script type="text/javascript">
+
+
+
+
+
+
+
+    var map = new BMap.Map("container"); // 创建地图实例  
+
+
+    //var point = new BMap.Point(121.361638, 31.233257); // 创建点坐标  
+   // map.centerAndZoom(point, 15); // 初始化地图，设置中心点坐标和地图级别
+
+
+   map.centerAndZoom("平湖", 15); // 初始化地图，设置中心点坐标和地图级别
+
+    // map.addOverlay(new BMap.Marker(point)); //添加标注
+
+    var top_right_navigation = new BMap.NavigationControl({
+        anchor: BMAP_ANCHOR_TOP_RIGHT,
+        enableGeolocation: true // 会多出一个点
+    }); //右上角，仅包含平移和缩放按钮
+    map.addControl(top_right_navigation);
+
+    map.enableScrollWheelZoom();
+
+
+
+
+    //个性化地图    https://lbsyun.baidu.com/index.php?title=jspopular/guide/custom
+    map.setMapStyle({
+        styleJson: [{
+            "featureType": "arterial",
+            "elementType": "all",
+            "stylers": {
+                "visibility": "off"
+            }
+        }, {
+            "featureType": "highway",
+            "elementType": "all",
+            "stylers": {
+                "visibility": "off"
+            }
+        }, {
+            "featureType": "railway",
+            "elementType": "all",
+            "stylers": {
+                "visibility": "off"
+            }
+        }, {
+            "featureType": "water",
+            "elementType": "all",
+            "stylers": {
+                "visibility": "off"
+            }
+        }, {
+            "featureType": "green",
+            "elementType": "all",
+            "stylers": {
+                "visibility": "off"
+            }
+        }, {
+            "featureType": "poi",
+            "elementType": "all",
+            "stylers": {
+                "visibility": "on"
+            }
+        }]
+    });
+
+
+
+     var myDistanceToolObject = new BMapLib.DistanceTool(map, {lineStroke : 2});     //http://api.map.baidu.com/library/DistanceTool/1.2/docs/symbols/BMapLib.DistanceTool.html
+     myDistanceToolObject.addEventListener("drawend", function(e) {  alert(e.distance);  });    //测距时，每次双击底图结束当前测距折线时,触发事件
+
+
+
+    //searchBusRes(point);
+
+    // 查找坐标点周边公交站
+    function searchBusRes(point, title, address) {
+        map.centerAndZoom(point, 15); // 初始化地图，设置中心点坐标和地图级别
+        var marker = new BMap.Marker(point);
+        map.addOverlay(marker); //添加标注
+        G('line-panel').innerHTML = '';
+        _color_index = 0;
+
+        if (title && address) {
+            var opts = {
+                width: 200,
+                height: 100,
+                title: title,
+                enableMessage: true
+            }
+            var infoWindow = new BMap.InfoWindow(address, opts); // 创建信息窗口对象 
+            marker.addEventListener("click", function() {
+                map.openInfoWindow(infoWindow, point); //开启信息窗口
+            });
+        }
+        var options = {
+            onSearchComplete: function(results) {
+                // 判断状态是否正确
+                //results:  百度返回的,符合条件的,目标点周边的公交站点
+
+
+              //  console.log("busName");
+              //  console.log(results);
+
+
+                if (local.getStatus() == BMAP_STATUS_SUCCESS) {
+                    var tempList = getBusList(results);   //自己封装的,不是百度的busline.getBusList(busName);
+                     //tempList  ，所有线路名称，一维数组，形如 ["平湖K212路", "平湖5路", "平湖215路临时线","平湖1路内环" ]
+
+
+                    //console.log(tempList);
+                    for (var i = tempList.length - 1; i >= 0; i--) {
+                        getBusLinePoints(tempList[i]);    //getBusLinePoints   自定义
+                    }
+                } else {
+                    alert('没有搜索到相关信息')
+                }
+            }
+        };
+        var local = new BMap.LocalSearch(point, options);
+        local.searchNearby("公交站", point, 1000);
+    }
+
+    // 吐出公交路线列表
+    function getBusList(results) {
+
+         //results: 百度返回的，满足查询条件的所有公交站点
+
+        var busItemList = [];
+        for (var i = 0; i < results.getCurrentNumPois(); i++) {
+
+
+            //poi  站点信息，包含经纬度，坐标等
+            var poi = results.getPoi(i);
+
+              
+            //console.log(poi);
+
+            var marker = new BMap.Marker(poi.point);  //获取经度和纬度
+            var icon = new BMap.Icon('http://image.yinxianwei.cn/icon.png', new BMap.Size(15, 15));
+            icon.setImageSize(new BMap.Size(15, 15));
+            marker.setIcon(icon);
+            marker.setTitle(poi.title);
+            marker.setTop(true);
+            //marker.setShadow(new BMap.Icon('./', new BMap.Size(0, 0)));
+            map.addOverlay(marker); //添加标注
+            try {
+
+
+                var tempList = poi.address.split('; ');  //以;分割
+                 //poi.address 形如  address: "平湖502路; 平湖k313路"
+
+
+
+                 //把获取到的路线名称加入busItemList数组,不重复
+                for (var j = tempList.length - 1; j >= 0; j--) {
+                    var item = tempList[j];
+                    if (busItemList.indexOf(item) == -1) {
+                        busItemList.push(item);
+                    }
+                }
+            } catch (e) {
+                console.warn(e);
+            }
+        }
+        return busItemList;
+    }
+
+    var _color_index = 0;
+    var _color_list = ['#0c88e8', '#3daafc', '#803300', '#252525', '#009688'];
+
+    // 获取公交路线颜色
+    function getLineColor() {
+        _color_index++;
+        return _color_list[_color_index % 5];
+    }
+
+    // 公交线坐标点列表
+    function getBusLinePoints(busName) {
+        var busline = new BMap.BusLineSearch(map, {
+            // renderOptions: {
+            //     map: map
+            // },
+            onGetBusListComplete: function(result) {
+                if (result) {
+                    //console.log(result.keyword);
+                    //console.log(result);
+                    var fstLine = result.getBusListItem(0); //获取第一个公交列表显示到map上,默认获取第一条路线(上下行中的一条)
+                   // console.log(fstLine);
+                    busline.getBusLine(fstLine);   //获取线路的站点
+                }
+            },
+            onGetBusLineComplete: function(result) {
+                //drawBiusLine(result);
+            }
+        });
+
+
+
+        //查询动作完成后的回调函数
+        //跟上面onGetBusLineComplete: function(result)作用一样,实现一个就行
+        busline.setGetBusLineCompleteCallback(function (result) {
+            //console.log("fangchao");
+		//console.log(result);//查询的完整结果
+
+           drawBiusLine(result);
+        });
+
+
+        //获取到的有的线路名称不规范，导致getBusList(busName)查询不到结果,处理下busName。比如 "平湖2路/k2路内环"  ,这个busName查询不到线路
+        var tempBusNameList = busName.split('/');
+
+
+        for (var j = tempBusNameList.length - 1; j >= 0; j--) {
+
+              var item = tempBusNameList[j];
+             // console.log(item);
+              busline.getBusList(item);   //百度api  ，搜索符合busName的所有线路，很可能返回不止一条线路，且每一条线路都有上下行， 返回后回调 onGetBusListComplete: function(result)
+         }
+
+
+        
+    }
+
+    // 绘制公交路线
+    function drawBiusLine(result) {
+       //result:  含有线路的名称，首末班时间，所属公交公司
+       // console.log(result);
+        var polyline = result.getPolyline();
+        var color = getLineColor();
+        polyline.setStrokeColor(color);
+        polyline.setStrokeWeight(3);
+        polyline.setStrokeOpacity(1);
+
+        var _id = 'p_' + _color_index;
+        //console.log(_color_index);
+       // console.log(_id);
+        polyline.line_id = _id;        //line_id :  形如 p_1  p_2  p_11
+        var _p = document.createElement('p');
+        _p.id = _id;
+        _p.title=result.name+result.startTime+"--"+result.endTime;
+        var _span = document.createElement('span');
+        _span.style.background = color;
+        _p.appendChild(_span);
+        _p.append(result.name.split('(')[0]);
+        _p.onmouseover = overLine;
+
+
+        G('line-panel').appendChild(_p);   //下边显示线路的panel
+
+
+<!--
+
+       polyline.addEventListener("click", function(e){ //给标注添加点击事件
+            //  console.log(e.point.lng);
+            //  console.log(e.point.lat);
+
+//console.log(e);
+//console.log(e.Wa.x);
+//console.log(e.pixel.x);
+//console.log(e.point.lat);
+
+
+            var Labelposition = new qq.maps.LatLng(e.point.lat,e.point.lng);
+
+       });
+
+-->
+
+
+
+        polyline.addEventListener('mouseover', function(sender) {
+            sender.target.setStrokeWeight(16);
+            sender.target.setStrokeOpacity(1);
+            //console.log(sender.point.lat);
+            //var Labelposition = new qq.maps.LatLng(sender.point.lat,sender.point.lng);
+
+            var tempId = sender.target.line_id;
+            document.getElementById(tempId).className = 'highlight';
+        });
+        polyline.addEventListener('mouseout', function(sender) {
+            sender.target.setStrokeWeight(3);
+            sender.target.setStrokeOpacity(0.65);
+
+            var tempId = sender.target.line_id;
+            document.getElementById(tempId).className = '';
+        });
+        map.addOverlay(polyline);
+    }
+
+    function G(id) {
+        return document.getElementById(id);
+    }
+
+
+    var ac = new BMap.Autocomplete( //建立一个自动完成的对象
+        {
+            "input": "suggestId",
+            "location": map
+        });
+
+    ac.addEventListener("onhighlight", function(e) { //鼠标放在下拉列表上的事件 ,左上角搜索框
+
+        var str = "";
+        var _value = e.fromitem.value;
+        //console.log(_value);
+        var value = "";
+        if (e.fromitem.index > -1) {
+            value = _value.province + _value.city + _value.district + _value.street + _value.business;
+        }
+        str = "FromItem<br />index = " + e.fromitem.index + "<br />value = " + value;
+
+        value = "";
+        if (e.toitem.index > -1) {
+            _value = e.toitem.value;
+            value = _value.province + _value.city + _value.district + _value.street + _value.business;
+        }
+        str += "<br />ToItem<br />index = " + e.toitem.index + "<br />value = " + value;
+        G("searchResultPanel").innerHTML = str;
+    });
+
+    var myValue;
+    ac.addEventListener("onconfirm", function(e) { //鼠标点击下拉列表后的事件
+        var _value = e.item.value;
+        myValue = _value.province + _value.city + _value.district + _value.street + _value.business;
+        G("searchResultPanel").innerHTML = "onconfirm<br />index = " + e.item.index + "<br />myValue = " + myValue;
+
+        setPlace();
+    });
+
+    function setPlace() {
+        map.clearOverlays(); //清除地图上所有覆盖物
+
+        function myFun() {
+            var poi = local.getResults().getPoi(0); //获取第一个智能搜索的结果
+            searchBusRes(poi.point, poi.title, poi.address);
+        }
+        var local = new BMap.LocalSearch(map, { //智能搜索
+            onSearchComplete: myFun,
+            renderOptions: {
+                selectFirstResult: true,
+                autoViewport: false
+            }
+        });
+        local.search(myValue);
+
+    }
+
+    var _lastPolyline;
+
+    function overLine(el) {
+        var line_id = el.target.getAttribute('id');
+        //console.log(line_id);
+        var polyline = getBusLine(line_id);
+        if (_lastPolyline) {
+            _lastPolyline.setStrokeWeight(3);
+            _lastPolyline.setStrokeOpacity(0.65);
+
+        }
+        if (polyline) {
+            polyline.setStrokeWeight(16);
+            polyline.setStrokeOpacity(1);
+
+            _lastPolyline = polyline;
+        }
+    }
+
+
+
+
+
+  // 鼠标选点
+
+function mouseChoosePoint(event) {
+console.log("----鼠标点击map----");
+console.log(window.event.srcElement);
+console.log("----鼠标点击map结束----");
+window.event.stopPropagation();
+window.event.preventDefault();
+
+	var point = {
+		lng: event.point.lng,
+		lat: event.point.lat
+	};
+	// 创建标注
+	var markerMouse = new BMap.Marker(point);
+        map.addOverlay(markerMouse); //添加标注
+
+	//创建右键菜单
+	//var markerMenu = new BMap.ContextMenu();
+	//markerMenu.addItem(new BMap.MenuItem('删除', removeMarker.bind(markerMouse)));
+	//markerMouse.addContextMenu(markerMenu);
+	//map.addOverlay(markerMouse);
+
+	//changeMouseEvent(); //使用一次标点功能后，自动关闭
+        G("mousePointBtn").click();
+
+}
+
+
+
+
+
+	
+
+ 
+
+
+  // 鼠标选点 判断是否监听
+
+
+   var mousePoint=false;
+function changeMouseEvent(ele,event) {
+window.event.stopPropagation();
+window.event.preventDefault();
+var kk = window.event.srcElement.tagName == "DIV"
+if(window.event.srcElement.tagName == "DIV") return;
+
+console.log("----changeMouseEvent----");
+console.log(window.event.srcElement);
+console.log("----changeMouseEvent结束----");
+
+
+
+
+
+//console.log(window.event.srcElement.tagName);
+//console.log(window.event);
+    //var src = e.target || window.event.srcElement;
+    //e就是事件源对象,src是触发源对象，e.target是firefox的方法,window.event.srcElement是IE的方法
+    //alert(src.value);
+
+
+        
+	mousePoint = !mousePoint;
+	if (mousePoint) {
+		G('mousePointBtn').innerHTML = "鼠标选点：开";
+                map.addEventListener('click', mouseChoosePoint,true);
+               // map.onclick = function(e){e.domEvent.stopPropagation();}
+	} else {
+		G('mousePointBtn').innerHTML = "鼠标选点：关";
+                map.removeEventListener('click', mouseChoosePoint,true);
+	}
+     
+
+
+}
+
+
+
+    function toDistenceTool(){
+
+
+     myDistanceToolObject.open(); //开启鼠标测距
+  
+  }
+
+
+    function getBusLine(line_id) {
+        //line_id   
+         // console.log("ffff");
+        //console.log(line_id);
+        
+        var tempList = map.getOverlays();     //获取所有覆盖物
+        for (var i = tempList.length - 1; i >= 0; i--) {
+            var item = tempList[i];
+
+
+            //原写法为什么要 item.line_id && item.line_id
+            //if (item.line_id && item.line_id == line_id) {     //从所有覆盖物中筛选出公交线路。事先在画公交线路的时候 赋予了 polyline.line_id = _id;    
+            if (item.line_id == line_id) {     //从所有覆盖物中筛选出公交线路。事先在画公交线路的时候 赋予了 polyline.line_id = _id;    
+                return item;
+            }
+        }
+    }
+    </script>
+</body>
+
+</html>
